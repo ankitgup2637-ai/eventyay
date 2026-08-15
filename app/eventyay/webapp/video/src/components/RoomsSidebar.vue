@@ -279,6 +279,8 @@ export default {
 	background-color: var(--clr-sidebar)
 	border-right: 1px solid #e7e7e7
 	box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2)
+	box-sizing: border-box
+	padding-bottom: 24px
 	display: flex
 	flex-direction: column
 	position: fixed
