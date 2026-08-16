@@ -293,7 +293,7 @@ export default {
 	z-index: 125
 	width: var(--sidebar-width)
 	bottom: 0
-	padding-bottom: 48px
+	padding-bottom: 24px
 	// Start off-screen on mobile, visible on desktop
 	transform: translateX(0)
 	// Animate open/close on all screen sizes
