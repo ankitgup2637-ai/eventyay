@@ -3,7 +3,7 @@ from urllib.parse import urlencode
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import validate_email
+from django.core.validators import validate_email, MinValueValidator, MaxValueValidator
 from django.db.models import Q
 from django.forms import CheckboxSelectMultiple, formset_factory
 from django.urls import reverse
@@ -186,6 +186,7 @@ class EventWizardBasicsForm(I18nModelForm):
             'detailed configuration later.'
         ),
         required=False,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
     team = forms.ModelChoiceField(
         label=_('Grant access to team'),
