@@ -20,6 +20,7 @@ from eventyay.base.models import (
     ProductMetaValue,
     ProductVariation,
     Order,
+    OrderPosition,
     Organizer,
     User,
     Voucher,
@@ -465,6 +466,44 @@ def checkinlist_select2(request, **kwargs):
                 'event': str(e.subevent) if request.event.has_subevents and e.subevent else None,
             }
             for e in qs[offset : offset + pagesize]
+        ],
+        'pagination': {'more': total >= (offset + pagesize)},
+    }
+    return JsonResponse(doc)
+
+
+@event_permission_required(None)
+def attendees_select2(request, **kwargs):
+    query = request.GET.get('query', '')
+    try:
+        page = int(request.GET.get('page', '1'))
+    except ValueError:
+        page = 1
+
+    qs = OrderPosition.objects.filter(
+        order__event=request.event,
+    ).select_related('order', 'product', 'variation')
+
+    if query:
+        qs = qs.filter(
+            Q(attendee_name_cached__icontains=i18ncomp(query))
+            | Q(attendee_email__icontains=query)
+            | Q(order__code__icontains=query)
+            | Q(order__email__icontains=query)
+        )
+
+    qs = qs.order_by('order__code', 'positionid')
+
+    total = qs.count()
+    pagesize = 20
+    offset = (page - 1) * pagesize
+    doc = {
+        'results': [
+            {
+                'id': op.pk,
+                'text': f"{op.order.code}-{op.positionid}: {op.attendee_name or op.addon_to.attendee_name if getattr(op, 'addon_to', None) else op.attendee_name or ''} ({op.attendee_email or op.order.email})",
+            }
+            for op in qs[offset : offset + pagesize]
         ],
         'pagination': {'more': total >= (offset + pagesize)},
     }

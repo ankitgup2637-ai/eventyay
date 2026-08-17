@@ -81,28 +81,33 @@ class SenderView(EventPermissionRequiredMixin, CopyDraftMixin, BulkReplyToMixin,
             statusq |= Q(status=Order.STATUS_PENDING, require_approval=False)
         orders = qs.filter(statusq)
 
-        opq = OrderPosition.objects.filter(
-            order=OuterRef('pk'),
-            canceled=False,
-            product_id__in=[p.pk for p in form.cleaned_data.get('products')],
-        )
+        if form.cleaned_data.get('recipients') == 'individual':
+            attendee = form.cleaned_data.get('attendee')
+            orders = Order.objects.filter(pk=attendee.order_id)
+            opq = OrderPosition.objects.filter(pk=attendee.pk, order=OuterRef('pk'))
+        else:
+            opq = OrderPosition.objects.filter(
+                order=OuterRef('pk'),
+                canceled=False,
+                product_id__in=[p.pk for p in form.cleaned_data.get('products')],
+            )
 
-        if form.cleaned_data.get('has_filter_checkins'):
-            ql = []
-            if form.cleaned_data.get('not_checked_in'):
-                ql.append(Q(checkins__list_id=None))
-            if form.cleaned_data.get('checkin_lists'):
-                ql.append(
-                    Q(
-                        checkins__list_id__in=[i.pk for i in form.cleaned_data.get('checkin_lists', [])],
+            if form.cleaned_data.get('has_filter_checkins'):
+                ql = []
+                if form.cleaned_data.get('not_checked_in'):
+                    ql.append(Q(checkins__list_id=None))
+                if form.cleaned_data.get('checkin_lists'):
+                    ql.append(
+                        Q(
+                            checkins__list_id__in=[i.pk for i in form.cleaned_data.get('checkin_lists', [])],
+                        )
                     )
-                )
-            if len(ql) == 2:
-                opq = opq.filter(ql[0] | ql[1])
-            elif ql:
-                opq = opq.filter(ql[0])
-            else:
-                opq = opq.none()
+                if len(ql) == 2:
+                    opq = opq.filter(ql[0] | ql[1])
+                elif ql:
+                    opq = opq.filter(ql[0])
+                else:
+                    opq = opq.none()
 
         if form.cleaned_data.get('subevent'):
             opq = opq.filter(subevent=form.cleaned_data.get('subevent'))
@@ -149,6 +154,43 @@ class SenderView(EventPermissionRequiredMixin, CopyDraftMixin, BulkReplyToMixin,
 
             return self.get(self.request, *self.args, **self.kwargs)
 
+        if self.request.POST.get('action') == 'test':
+            test_email = form.cleaned_data.get('test_email')
+            if not test_email:
+                messages.error(self.request, _('Please enter a valid test email address.'))
+                return self.get(self.request, *self.args, **self.kwargs)
+
+            from eventyay.base.services.mail import mail
+            l = self.request.event.settings.locale
+            with language(l, self.request.event.settings.region):
+                context_dict = build_email_preview_context(
+                    self.request.event, ['event', 'order', 'position_or_address']
+                )
+                subject = nh3.clean(form.cleaned_data['subject'].localize(l), tags=set())
+                preview_subject = nh3.clean(subject.format_map(context_dict), tags=set())
+                message = form.cleaned_data['message'].localize(l)
+
+                try:
+                    mail(
+                        email=test_email,
+                        subject=preview_subject,
+                        template=message,
+                        context=context_dict,
+                        event=self.request.event,
+                        locale=l,
+                        sender=self.request.event.settings.get('mail_from'),
+                        event_bcc=self.request.event.settings.get('mail_bcc'),
+                        event_reply_to=self._get_reply_to_for_bulk_email() or '',
+                        user=self.request.user,
+                        auto_email=False,
+                    )
+                    messages.success(self.request, _('Test email sent successfully.'))
+                except Exception as e:
+                    logger.exception("Mail transport error while sending test email")
+                    messages.error(self.request, _('Error sending test email: {error}').format(error=str(e)))
+
+            return self.get(self.request, *self.args, **self.kwargs)
+
         scheduled_at = form.cleaned_data.get('scheduled_at')
         qm = EmailQueue.objects.create(
             event=self.request.event,
@@ -163,7 +205,7 @@ class SenderView(EventPermissionRequiredMixin, CopyDraftMixin, BulkReplyToMixin,
             scheduled_at=scheduled_at,
         )
 
-        EmailQueueFilter.objects.create(
+        filters = EmailQueueFilter.objects.create(
             mail=qm,
             recipients=form.cleaned_data['recipients'],
             order_status=form.cleaned_data['order_status'],
@@ -178,6 +220,10 @@ class SenderView(EventPermissionRequiredMixin, CopyDraftMixin, BulkReplyToMixin,
             order_created_from=form.cleaned_data.get('order_created_from'),
             order_created_to=form.cleaned_data.get('order_created_to'),
         )
+
+        if form.cleaned_data['recipients'] == 'individual':
+            filters.positions = [form.cleaned_data['attendee'].pk]
+            filters.save(update_fields=['positions'])
 
         qm.populate_to_users()
 

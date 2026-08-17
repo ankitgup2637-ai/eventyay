@@ -19,7 +19,7 @@ from eventyay.base.models.checkin import CheckinList
 from eventyay.base.models.event import SubEvent
 from eventyay.base.models.product import Product
 from eventyay.base.models.organizer import Team
-from eventyay.base.models.orders import Order
+from eventyay.base.models.orders import Order, OrderPosition
 from eventyay.common.forms.mixins import ScheduledAtValidationMixin
 from eventyay.consts import SizeKey
 from eventyay.control.forms import CachedFileField
@@ -107,6 +107,11 @@ class MailForm(ScheduledAtValidationMixin, forms.Form):
         label=pgettext_lazy('subevent', 'Only send to customers with orders created before'),
         required=False,
     )
+    test_email = forms.EmailField(
+        label=_('Test email address'),
+        required=False,
+        help_text=_('Enter an email address to send a test message to.')
+    )
     scheduled_at = SplitDateTimeField(
         widget=SplitDateTimePickerWidget(),
         label=_('Send later'),
@@ -135,6 +140,8 @@ class MailForm(ScheduledAtValidationMixin, forms.Form):
                     'If you set a date range, please set both a start and an end.',
                 )
             )
+        if d.get('recipients') == 'individual' and not d.get('attendee'):
+            self.add_error('attendee', ValidationError(_('Please select an attendee.')))
         return d
 
     def _set_field_placeholders(self, fn, base_parameters):
@@ -162,7 +169,30 @@ class MailForm(ScheduledAtValidationMixin, forms.Form):
                     _('Both (all order contact addresses and all attendee email addresses)'),
                 ),
             ]
+        recp_choices.append(('individual', _('Individual attendee')))
         self.fields['recipients'].choices = recp_choices
+
+        self.fields['attendee'] = forms.ModelChoiceField(
+            queryset=OrderPosition.objects.filter(order__event=event),
+            required=False,
+            label=_('Attendee'),
+        )
+        self.fields['attendee'].widget = Select2(
+            attrs={
+                'data-model-select2': 'generic',
+                'data-select2-url': reverse(
+                    'control:event.attendees.select2',
+                    kwargs={
+                        'event': event.slug,
+                        'organizer': event.organizer.slug,
+                    },
+                ),
+                'data-placeholder': _('Search for an attendee'),
+            }
+        )
+        if self.initial.get('attendee'):
+            self.fields['attendee'].widget.choices = [(self.initial['attendee'].pk, str(self.initial['attendee']))]
+
 
         self.fields['subject'] = I18nFormField(
             label=_('Subject'),

@@ -28,6 +28,7 @@ class Recipients(models.TextChoices):
     ORDERS = 'orders', 'Orders'
     ATTENDEES = 'attendees', 'Attendees'
     BOTH = 'both', 'Both'
+    INDIVIDUAL = 'individual', 'Individual'
 
 
 
@@ -253,10 +254,17 @@ class EmailQueue(models.Model):
             return
 
         recipients_mode = filters.recipients or "orders"
-        orders_qs = Order.objects.filter(
-            pk__in=filters.orders,
-            event=self.event
-        ).prefetch_related('positions__product', 'positions__addons', 'positions__checkins')
+
+        if recipients_mode == "individual":
+            orders_qs = Order.objects.filter(
+                all_positions__pk__in=getattr(filters, 'positions', []),
+                event=self.event
+            ).distinct().prefetch_related('positions__product', 'positions__addons', 'positions__checkins')
+        else:
+            orders_qs = Order.objects.filter(
+                pk__in=getattr(filters, 'orders', []),
+                event=self.event
+            ).prefetch_related('positions__product', 'positions__addons', 'positions__checkins')
 
         recipients = defaultdict(lambda: {
             "orders": set(),
@@ -265,6 +273,20 @@ class EmailQueue(models.Model):
         })
 
         for order in orders_qs:
+            # Explicit individual attendee handling
+            if recipients_mode == "individual":
+                for pos in order.positions.all():
+                    if getattr(filters, 'positions', []) and pos.pk not in filters.positions:
+                        continue
+                    # Find the correct email to use for this attendee
+                    email = pos.attendee_email or order.email
+                    if email:
+                        email = email.strip().lower()
+                        recipients[email]["orders"].add(order.pk)
+                        recipients[email]["positions"].add(pos.pk)
+                        recipients[email]["products"].add(pos.product_id)
+                continue
+
             order_fallback_needed = False
             attendee_found = False
 
@@ -331,22 +353,22 @@ class EmailQueueToUser(models.Model):
 
     :param email: Email address of the recipient.
     :type email: email
-    
+
     :param orders: List of order IDs associated with this recipient.
     :type orders: list[int]
-    
+
     :param positions: List of order position IDs.
     :type positions: list[int]
-    
+
     :param products: List of product IDs associated with this user.
     :type products: list[int]
-    
+
     :param team: Team ID if this is a team recipient.
     :type team: int or None
-    
+
     :param sent: Whether this recipient has been successfully sent the email.
     :type sent: bool
-    
+
     :param error: Error message if sending failed.
     :type error: str or None
     """
@@ -372,43 +394,43 @@ class EmailQueueFilter(models.Model):
 
     :param mail: Associated EmailQueue.
     :type mail: EmailQueue
-    
+
     :param recipients: Target recipient scope: 'orders', 'attendees', or 'both'.
     :type recipients: str
-    
+
     :param order_status: Email roles or tags to include.
     :type order_status: list[str]
-    
+
     :param products: Filter by product IDs.
     :type products: list[int]
-    
+
     :param checkin_lists: Check-in list IDs to filter by.
     :type checkin_lists: list[int]
-    
+
     :param has_filter_checkins: Whether to filter based on check-in status.
     :type has_filter_checkins: bool
-    
+
     :param not_checked_in: Whether to include only recipients who haven’t checked in.
     :type not_checked_in: bool
-    
+
     :param subevent: Specific subevent ID to target.
     :type subevent: int or None
-    
+
     :param subevents_from: Filter subevents from this date/time onward.
     :type subevents_from: datetime.datetime or None
-    
+
     :param subevents_to: Filter subevents up to this date/time.
     :type subevents_to: datetime.datetime or None
-    
+
     :param order_created_from: Include orders created after this date/time.
     :type order_created_from: datetime.datetime or None
-    
+
     :param order_created_to: Include orders created before this date/time.
     :type order_created_to: datetime.datetime or None
-    
+
     :param orders: Explicit order IDs to include.
     :type orders: list[int]
-    
+
     :param teams: Team IDs to include (for team-based emails).
     :type teams: list[int]
     """
@@ -417,6 +439,7 @@ class EmailQueueFilter(models.Model):
     recipients = models.CharField(max_length=10, choices=Recipients.choices, default=Recipients.ORDERS, blank=True)
     order_status = ArrayField(models.CharField(max_length=20), blank=True, default=list)
     products = ArrayField(models.BigIntegerField(), blank=True, default=list)
+    positions = ArrayField(models.BigIntegerField(), blank=True, default=list)
     checkin_lists = ArrayField(models.IntegerField(), blank=True, default=list)
     has_filter_checkins = models.BooleanField(default=False)
     not_checked_in = models.BooleanField(default=False)
