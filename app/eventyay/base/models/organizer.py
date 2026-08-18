@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.core.validators import MinLengthValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import Exists, OuterRef, Q
@@ -37,7 +38,7 @@ from .auth import User
 logger = logging.getLogger(__name__)
 
 
-class TeamPermissionError(Exception):
+class TeamPermissionError(PermissionDenied):
     """Raised when team access permission checks fail to preserve administrator access."""
 
     pass
@@ -214,7 +215,6 @@ class Organizer(LoggedModel, TimestampedModel, RulesModelMixin, models.Model, me
         this organizer, so you don't have to prefix your cache keys. In addition, the cache
         is being cleared every time the organizer changes.
         """
-        # FIXME: This "cache" module is missing.
         from eventyay.base.cache import ObjectRelatedCache
 
         return ObjectRelatedCache(self)
@@ -411,6 +411,22 @@ class Team(LoggedModel, TimestampedModel, RulesModelMixin, models.Model, metacla
     )
     can_view_vouchers = models.BooleanField(default=False, verbose_name=_('Can view vouchers'))
     can_change_vouchers = models.BooleanField(default=False, verbose_name=_('Can change vouchers'))
+
+    TEAMSHIFTS_ROLE_CHOICES = [
+        ('coordinator', _('Event Coordinator')),
+        ('lead', _('Team Lead')),
+    ]
+
+    teamshifts_role = models.CharField(
+        max_length=20,
+        choices=TEAMSHIFTS_ROLE_CHOICES,
+        default='',
+        blank=True,
+        verbose_name=_('TeamShifts role'),
+    )
+    all_teamshifts_roles = models.BooleanField(default=False, verbose_name=_('All teamshifts roles'))
+    limit_teamshifts_roles = models.JSONField(default=list, blank=True, verbose_name=_('Limit teamshifts roles'))
+    hide_teamshifts_emails = models.BooleanField(default=False, verbose_name=_('Hide email addresses'))
 
     def __str__(self) -> str:
         return _('%(name)s on %(object)s') % {

@@ -36,6 +36,7 @@ from django.views.generic.detail import SingleObjectMixin
 from i18nfield.strings import LazyI18nString
 from i18nfield.utils import I18nJSONEncoder
 
+from eventyay.timezones import localize_datetime
 from eventyay.base.channels import get_all_sales_channels
 from eventyay.base.email import get_available_placeholders
 from eventyay.common.sanitizers import sanitize_email_html
@@ -48,6 +49,8 @@ from eventyay.base.models import (
     Voucher,
 )
 from eventyay.base.models.event import EventMetaValue
+from eventyay.base.models.global_plugin_config import GlobalPluginConfig
+from eventyay.base.plugins import get_all_plugins
 from eventyay.base.services import tickets
 from eventyay.base.services.invoices import build_preview_invoice_pdf
 from eventyay.base.signals import register_ticket_outputs
@@ -291,8 +294,8 @@ class EventUpdate(
             return self.form_invalid(form)
 
     @staticmethod
-    def reset_timezone(tz, dt):
-        return tz.localize(dt.replace(tzinfo=None)) if dt is not None else None
+    def reset_timezone(zone, dt):
+        return localize_datetime(dt, zone)
 
     @cached_property
     def product_meta_property_formset(self):
@@ -345,11 +348,13 @@ class EventPlugins(
         return self.request.event
 
     def get_context_data(self, *args, **kwargs) -> dict:
-        from eventyay.base.plugins import get_all_plugins
-
         context = super().get_context_data(*args, **kwargs)
+        hidden_from_organizer = GlobalPluginConfig.get_hidden_from_organizer_modules()
         plugins = [
-            p for p in get_all_plugins(self.object) if not p.name.startswith('.') and getattr(p, 'visible', True)
+            p for p in get_all_plugins(self.object)
+            if not p.name.startswith('.')
+            and getattr(p, 'visible', True)
+            and p.module not in hidden_from_organizer
         ]
         order = [
             'FEATURE',
@@ -386,14 +391,15 @@ class EventPlugins(
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
-        from eventyay.base.plugins import get_all_plugins
-
         self.object = self.get_object()
 
+        hidden_from_organizer = GlobalPluginConfig.get_hidden_from_organizer_modules()
         plugins_available = {
             p.module: p
             for p in get_all_plugins(self.object)
-            if not p.name.startswith('.') and getattr(p, 'visible', True)
+            if not p.name.startswith('.')
+            and getattr(p, 'visible', True)
+            and p.module not in hidden_from_organizer
         }
 
         with transaction.atomic():
@@ -700,9 +706,7 @@ class InvoicePreview(EventPermissionRequiredMixin, View):
         return resp
 
 
-class DangerZone(EventPermissionRequiredMixin, TemplateView):
-    permission = 'can_change_event_settings'
-    template_name = 'pretixcontrol/event/dangerzone.html'
+
 
 
 class DisplaySettings(View):
