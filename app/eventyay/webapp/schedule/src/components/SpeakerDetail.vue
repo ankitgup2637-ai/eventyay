@@ -286,8 +286,6 @@ export default {
 	display: flex
 	flex-direction: column
 	background-color: $clr-white
-	.back-nav
-		display: none
 	.speaker-wrapper
 		flex: auto
 		display: flex
