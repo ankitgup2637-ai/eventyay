@@ -1,6 +1,6 @@
 <template lang="pug">
 .c-speaker-detail
-	detail-back-nav(:event-url="eventUrl")
+	detail-back-nav(:event-url="eventUrl", hide-back)
 		detail-top-actions(
 			:export-options="speakerExportOptions",
 			:qrcodes-url="speakerQrcodesUrl")
@@ -286,6 +286,8 @@ export default {
 	display: flex
 	flex-direction: column
 	background-color: $clr-white
+	.back-nav
+		display: none
 	.speaker-wrapper
 		flex: auto
 		display: flex
