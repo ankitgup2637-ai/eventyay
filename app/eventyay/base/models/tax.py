@@ -136,7 +136,7 @@ class TaxRule(LoggedModel):
         help_text=_('Should be short, e.g. "VAT"'),
         max_length=190,
     )
-    rate = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Tax rate'), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    rate = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Tax rate'))
     price_includes_tax = models.BooleanField(
         verbose_name=_('The configured product prices include the tax amount'),
         default=True,
@@ -191,6 +191,8 @@ class TaxRule(LoggedModel):
     def clean(self):
         if self.eu_reverse_charge and not self.home_country:
             raise ValidationError(_('You need to set your home country to use the reverse charge feature.'))
+        if self.rate is not None and (self.rate < 0 or self.rate > 100):
+            raise ValidationError({'rate': _('Tax rate must be between 0 and 100.')})
 
     def __str__(self):
         if self.price_includes_tax:
