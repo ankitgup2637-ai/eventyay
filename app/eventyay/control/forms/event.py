@@ -1709,6 +1709,7 @@ class QuickSetupForm(I18nForm):
         required=False,
         max_digits=10,
         decimal_places=2,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
     tax_price_includes_tax = forms.BooleanField(
         label=_('The configured product prices include the tax amount'),
