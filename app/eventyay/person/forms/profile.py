@@ -34,7 +34,7 @@ from eventyay.common.forms.widgets import (
     ClearableBasenameFileInput,
     EnhancedSelect,
     EnhancedSelectMultiple,
-    MarkdownWidget,
+    RichTextWidget,
 )
 from eventyay.common.text.phrases import phrases
 from eventyay.consts import SizeKey
@@ -317,10 +317,10 @@ class SpeakerProfileForm(
         fields = ('biography',)
         public_fields = ['fullname', 'biography', 'avatar']
         widgets = {
-            'biography': MarkdownWidget,
+            'biography': RichTextWidget,
             'avatar': ClearableBasenameFileInput,
-            'avatar_source': MarkdownWidget,
-            'avatar_license': MarkdownWidget,
+            'avatar_source': RichTextWidget,
+            'avatar_license': RichTextWidget,
         }
         field_classes = {
             'avatar': ImageField,
