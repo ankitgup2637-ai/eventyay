@@ -43,7 +43,7 @@ class SpeakerProfile(PretalxModel):
     event = models.ForeignKey(to='Event', related_name='+', on_delete=models.CASCADE)
     biography = models.TextField(
         verbose_name=_('Biography'),
-        help_text=phrases.base.use_markdown,
+        help_text=phrases.base.use_richtext,
         null=True,
         blank=True,
     )

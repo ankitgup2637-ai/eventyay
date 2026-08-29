@@ -20,6 +20,7 @@ from eventyay.common.forms.fields import (
     ImageField,
     NewPasswordConfirmationField,
     NewPasswordField,
+    RichTextField,
     SizeFileField,
 )
 from eventyay.common.forms.mixins import (
@@ -340,13 +341,11 @@ class SpeakerProfileForm(
         widgets = {
             'biography': RichTextWidget,
             'avatar': ClearableBasenameFileInput,
-            'avatar_source': RichTextWidget,
-            'avatar_license': RichTextWidget,
+            'avatar_source': forms.Textarea(attrs={'rows': 2}),
+            'avatar_license': forms.Textarea(attrs={'rows': 2}),
         }
         field_classes = {
-            'avatar': ImageField,
-        }
-        field_classes = {
+            'biography': RichTextField,
             'avatar': ImageField,
         }
         request_require = {'biography', 'availabilities'}

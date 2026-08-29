@@ -4,6 +4,7 @@
 {% load vite %}
 {% load html_signal %}
 {% load i18n %}
+{% load rich_text %}
 {% load static %}
 
 {% block title %}{{ profile.user.get_display_name }} ::{% endblock title %}
@@ -35,7 +36,7 @@
     {% endwith %}
     <noscript>
         <h1>{{ profile.user.get_display_name }}</h1>
-        {% if profile.biography %}<p>{{ profile.biography }}</p>{% endif %}
+        {% if profile.biography %}<div class="speaker-bio">{{ profile.biography|event_localize|rich_text }}</div>{% endif %}
     </noscript>
 </div>
 {% html_signal "eventyay.agenda.signals.html_below_speaker_pages" sender=request.event request=request profile=profile %}

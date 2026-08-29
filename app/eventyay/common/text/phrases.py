@@ -97,6 +97,10 @@ class BasePhrases(Phrases, app='base'):
         '<span class="markdown-hint">{}</span>',
         _('You can use Markdown in this field.'),
     )
+    use_richtext = format_html(
+        '<span class="rich-text-hint">{}</span>',
+        _('You can use the rich-text editor toolbar to format your text.'),
+    )
     public_content = _('This content will be shown publicly.')
 
     quotation_open = pgettext_lazy('opening quotation mark', '“')
