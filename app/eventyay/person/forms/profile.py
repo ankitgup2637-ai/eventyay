@@ -1,3 +1,4 @@
+import copy
 from functools import partial
 
 from django import forms
@@ -15,7 +16,6 @@ from eventyay.base.models.cfp import default_fields
 from eventyay.base.models.information import SpeakerInformation
 from eventyay.base.models.submission import SubmissionStates
 from eventyay.cfp.forms.cfp import CfPFormMixin
-from eventyay.common.templatetags.filesize import filesize
 from eventyay.common.forms.fields import (
     ImageField,
     NewPasswordConfirmationField,
@@ -38,6 +38,7 @@ from eventyay.common.forms.widgets import (
     EnhancedSelectMultiple,
     RichTextWidget,
 )
+from eventyay.common.templatetags.filesize import filesize
 from eventyay.common.text.phrases import phrases
 from eventyay.consts import SizeKey
 from eventyay.schedule.forms import AvailabilitiesFormMixin
@@ -130,10 +131,13 @@ class SpeakerProfileForm(
             if field == 'avatar':
                 field_kwargs['max_size'] = settings.MAX_SIZE_CONFIG[SizeKey.UPLOAD_SIZE_IMAGE]
             self.fields[field] = field_class(**field_kwargs)
-            custom_widget_class = self.Meta.widgets.get(field)
-            if custom_widget_class:
+            custom_widget = self.Meta.widgets.get(field)
+            if custom_widget:
                 old_widget = self.fields[field].widget
-                new_widget = custom_widget_class()
+                if callable(custom_widget):
+                    new_widget = custom_widget()
+                else:
+                    new_widget = copy.deepcopy(custom_widget)
                 # Preserve selected attributes (such as data-maxsize, data-sizewarning, accept)
                 # that may have been set on the original widget, without overriding
                 # attributes defined by the new custom widget.
