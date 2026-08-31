@@ -262,7 +262,13 @@ class SpeakerProfileForm(
     def clean(self):
         data = super().clean()
         _cfp = getattr(self.event, 'cfp', None) if hasattr(self.event, 'cfp') else None
-        if not getattr(self, 'not_strict', False) and _cfp and _cfp.require_avatar and not data.get('avatar') and not data.get('get_gravatar'):
+        if (
+            not getattr(self, 'not_strict', False)
+            and _cfp
+            and _cfp.require_avatar
+            and not data.get('avatar')
+            and not data.get('get_gravatar')
+        ):
             if _cfp.enable_gravatar:
                 msg = _('Please provide a profile picture or allow us to load your picture from gravatar!')
             else:

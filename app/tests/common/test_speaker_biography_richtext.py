@@ -8,48 +8,31 @@ from eventyay.common.text.phrases import phrases
 from eventyay.person.forms.profile import SpeakerProfileForm
 
 
-def test_richtext_widget_format_value_empty():
-    widget = RichTextWidget()
-    assert widget.format_value(None) == ''
-    assert widget.format_value('') == ''
+def test_richtext_field_clean_empty():
+    field = RichTextField(required=False)
+    assert field.clean(None) == ''
+    assert field.clean('') == ''
 
 
-def test_richtext_widget_format_value_legacy_markdown():
-    widget = RichTextWidget()
-    # Bold markdown
-    formatted = widget.format_value('**Alice**')
-    assert '<p><strong>Alice</strong></p>' in formatted
-
-    # List markdown
-    formatted_list = widget.format_value('* First item\n* Second item')
-    assert '<ul>' in formatted_list
-    assert '<li>First item</li>' in formatted_list
-    assert '<li>Second item</li>' in formatted_list
-
-    # Plain text
-    formatted_plain = widget.format_value('Just plain text')
-    assert '<p>Just plain text</p>' in formatted_plain
-
-
-def test_richtext_widget_format_value_preserves_existing_html():
-    widget = RichTextWidget()
+def test_richtext_field_clean_preserves_existing_html():
+    field = RichTextField(required=False)
     html = '<p>Already <strong>HTML</strong> content</p>'
-    assert widget.format_value(html) == html
+    assert field.clean(html) == html
 
 
-def test_richtext_widget_format_value_sanitizes_xss():
-    widget = RichTextWidget()
+def test_richtext_field_clean_sanitizes_xss():
+    field = RichTextField(required=False)
     # Strips script tags
     dangerous = '<script>alert("xss")</script><p>Safe text</p>'
-    formatted = widget.format_value(dangerous)
-    assert '<script>' not in formatted
-    assert '<p>Safe text</p>' in formatted
+    cleaned = field.clean(dangerous)
+    assert '<script>' not in cleaned
+    assert '<p>Safe text</p>' in cleaned
 
     # Strips dangerous attributes like onclick and javascript: links
     dangerous_attr = '<p onclick="evil()"><a href="javascript:alert(1)">link</a></p>'
-    formatted_attr = widget.format_value(dangerous_attr)
-    assert 'onclick' not in formatted_attr
-    assert 'javascript:' not in formatted_attr
+    cleaned_attr = field.clean(dangerous_attr)
+    assert 'onclick' not in cleaned_attr
+    assert 'javascript:' not in cleaned_attr
 
 
 def test_speaker_profile_form_field_classes_and_widgets():
