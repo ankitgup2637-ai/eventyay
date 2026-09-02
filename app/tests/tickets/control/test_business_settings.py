@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 from django.urls import resolve, reverse
+from django.utils.timezone import now
 
 from eventyay.base.models import User
 from eventyay.base.settings import GlobalSettingsObject
@@ -10,9 +11,6 @@ from eventyay.control.forms.global_settings import (
     GlobalSettingsForm,
 )
 from eventyay.control.navigation import get_admin_navigation
-
-
-from django.utils.timezone import now
 
 
 @pytest.fixture

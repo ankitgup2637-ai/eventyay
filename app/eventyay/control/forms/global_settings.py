@@ -482,7 +482,22 @@ class GlobalSettingsForm(SettingsForm):
             ]),
         ]
 
-        if 'interpretation' in settings.INSTALLED_APPS:
+        if any(app.endswith('interpretation') or app == 'interpretation' for app in settings.INSTALLED_APPS):
+            self.fields['voxbento_base_url'] = forms.URLField(
+                label=_('VoxBento Base URL'),
+                required=False,
+                help_text=_('Base URL of the VoxBento interpretation server (e.g. https://interpretation.eventyay.com).'),
+            )
+            self.fields['voxbento_client_id'] = forms.CharField(
+                label=_('VoxBento Client ID'),
+                required=False,
+                help_text=_('Client ID for authenticating with VoxBento API.'),
+            )
+            self.fields['voxbento_client_secret'] = SecretKeySettingsField(
+                label=_('VoxBento Client Secret'),
+                required=False,
+                help_text=_('Client Secret for authenticating with VoxBento API.'),
+            )
             self.field_groups.append(
                 ('voxbento', _('VoxBento'), [
                     'voxbento_base_url',
@@ -491,7 +506,21 @@ class GlobalSettingsForm(SettingsForm):
                 ])
             )
 
-        if 'hubspot' in settings.INSTALLED_APPS:
+        if any(app.endswith('hubspot') or app == 'hubspot' for app in settings.INSTALLED_APPS):
+            self.fields['hubspot_client_id'] = forms.CharField(
+                label=_('HubSpot Client ID'),
+                required=False,
+            )
+            self.fields['hubspot_client_secret'] = SecretKeySettingsField(
+                label=_('HubSpot Client Secret'),
+                required=False,
+            )
+            self.fields['hubspot_property_sync_ttl_minutes'] = forms.IntegerField(
+                label=_('HubSpot Property Sync TTL (minutes)'),
+                required=False,
+                min_value=0,
+                initial=60,
+            )
             self.field_groups.append(
                 ('hubspot', _('HubSpot'), [
                     'hubspot_client_id',
