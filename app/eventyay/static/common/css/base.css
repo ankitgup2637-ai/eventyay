@@ -72,9 +72,17 @@ h2.content-header {
 }
 
 #main-card > main h1:first-child,
-#main-card > main h2:first-child {
+#main-card > main h2:first-child,
+#main-card > main > h1,
+#main-card > main > h2,
+#main-card > main > :first-child h1,
+#main-card > main > :first-child h2 {
   margin-top: 0;
   padding-top: 0;
+}
+
+#main-card > main > main > section.front-page:first-child {
+  margin-top: 0;
 }
 
 button,
