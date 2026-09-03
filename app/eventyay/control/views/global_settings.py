@@ -26,6 +26,7 @@ from eventyay.base.services.update_check import check_result_table, update_check
 from eventyay.base.settings import GlobalSettingsObject
 from eventyay.common.sanitizers import sanitize_rich_text
 from eventyay.control.forms.global_settings import (
+    GlobalBusinessSettingsForm,
     GlobalSettingsForm,
     SSOConfigForm,
     UpdateSettingsForm,
@@ -42,6 +43,15 @@ logger = logging.getLogger(__name__)
 class GlobalSettingsView(AdministratorPermissionRequiredMixin, FormView):
     template_name = 'pretixcontrol/global_settings.html'
     form_class = GlobalSettingsForm
+
+    def get(self, request, *args, **kwargs):
+        tab = request.GET.get('tab', '').lower()
+        if tab in ('vouchers', 'event_vouchers'):
+            return redirect(reverse('eventyay_admin:admin.vouchers'))
+        if tab in ('organizer_billing', 'ticket_fee', 'billing_validation', 'business'):
+            target_hash = f'#tab-{tab}' if tab in ('organizer_billing', 'ticket_fee', 'billing_validation') else ''
+            return redirect(reverse('eventyay_admin:admin.global.business') + target_hash)
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         from eventyay.base.gmail.models import GmailOAuthCredential
@@ -68,6 +78,23 @@ class GlobalSettingsView(AdministratorPermissionRequiredMixin, FormView):
 
     def get_success_url(self):
         return reverse('eventyay_admin:admin.global.settings')
+
+
+class GlobalBusinessSettingsView(AdministratorPermissionRequiredMixin, FormView):
+    template_name = 'pretixcontrol/admin/business_settings.html'
+    form_class = GlobalBusinessSettingsForm
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, _('Your changes have been saved.'))
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, _('Your changes have not been saved, see below for errors.'))
+        return super().form_invalid(form)
+
+    def get_success_url(self):
+        return reverse('eventyay_admin:admin.global.business')
 
 
 class MetaDataSettingsView(AdministratorPermissionRequiredMixin, FormView):
