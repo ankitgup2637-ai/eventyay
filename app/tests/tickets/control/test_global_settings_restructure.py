@@ -258,6 +258,14 @@ class TestLegacyUrlsAndRedirects:
         assert response.status_code == 302
         assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
 
+    def test_legacy_update_url_post_trigger_executes_update_check_and_redirects(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.update')
+        with patch('eventyay.control.views.global_settings.update_check.apply') as mock_apply:
+            response = staff_client.post(url, {'trigger': '1'})
+            assert response.status_code == 302
+            assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
+            mock_apply.assert_called_once()
+
     def test_global_settings_query_tab_redirects_for_ticketing(self, staff_client):
         url = reverse('eventyay_admin:admin.global.settings')
 

@@ -138,6 +138,16 @@ class MetaDataSettingsView(AdministratorPermissionRequiredMixin, View):
         return redirect(reverse('eventyay_admin:admin.global.settings') + '#tab-meta-data')
 
 
+class UpdateRedirectView(AdministratorPermissionRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        return redirect(reverse('eventyay_admin:admin.global.settings') + '#tab-update-check')
+
+    def post(self, request, *args, **kwargs):
+        if request.POST.get('trigger') == '1':
+            update_check.apply()
+        return redirect(reverse('eventyay_admin:admin.global.settings') + '#tab-update-check')
+
+
 class SSOView(AdministratorPermissionRequiredMixin, FormView):
     template_name = 'pretixcontrol/global_sso.html'
     form_class = SSOConfigForm
