@@ -691,23 +691,33 @@ class GlobalTicketingSettingsForm(SettingsForm):
             ]
         )
 
-        self.field_groups = [
-            ('payment-gateways', _('Payment Gateways'), [
-                # Stripe for Ticket Payments
-                'payment_stripe_connect_client_id',
-                'payment_stripe_connect_publishable_key',
-                'payment_stripe_connect_secret_key',
-                'payment_stripe_connect_test_publishable_key',
-                'payment_stripe_connect_test_secret_key',
-                'payment_stripe_connect_app_fee_percent',
-                'payment_stripe_connect_app_fee_min',
-                'payment_stripe_connect_app_fee_max',
+        responses = register_global_settings.send(self)
+        payment_gateway_fields = [
+            # Stripe for Ticket Payments
+            'payment_stripe_connect_client_id',
+            'payment_stripe_connect_publishable_key',
+            'payment_stripe_connect_secret_key',
+            'payment_stripe_connect_test_publishable_key',
+            'payment_stripe_connect_test_secret_key',
+            'payment_stripe_connect_app_fee_percent',
+            'payment_stripe_connect_app_fee_min',
+            'payment_stripe_connect_app_fee_max',
 
-                # PayPal
-                'payment_paypal_connect_client_id',
-                'payment_paypal_connect_secret_key',
-                'payment_paypal_connect_endpoint',
-            ]),
+            # PayPal
+            'payment_paypal_connect_client_id',
+            'payment_paypal_connect_secret_key',
+            'payment_paypal_connect_endpoint',
+        ]
+        for r, response in sorted(responses, key=lambda r: str(r[0])):
+            for key, value in response.items():
+                if key.startswith('payment_'):
+                    if key not in self.fields:
+                        self.fields[key] = value
+                    if key not in payment_gateway_fields:
+                        payment_gateway_fields.append(key)
+
+        self.field_groups = [
+            ('payment-gateways', _('Payment Gateways'), payment_gateway_fields),
             ('cart', _('Cart'), [
                 'reservation_time',
                 'max_products_per_order',

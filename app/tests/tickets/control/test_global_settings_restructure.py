@@ -287,6 +287,11 @@ class TestGlobalTicketingSettings:
         assert set(form.fields.keys()) == expected_fields
 
 
+from collections import OrderedDict
+from django import forms as dj_forms
+from eventyay.base.signals import register_global_settings
+
+
 @pytest.mark.django_db
 class TestLegacyUrlsAndRedirects:
     def test_legacy_metadata_url_redirects_to_settings_tab(self, staff_client):
@@ -295,11 +300,24 @@ class TestLegacyUrlsAndRedirects:
         assert response.status_code == 302
         assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-meta-data"
 
-    def test_legacy_update_url_redirects_to_settings_tab(self, staff_client):
+    def test_legacy_update_url_accessible_by_staff_without_admin_session(self, client):
+        # Staff user without an active administrator / sudo session
+        staff_user = User.objects.create_user('staff_only@example.com', 'dummy', is_staff=True)
+        client.force_login(staff_user)
+
         url = reverse('eventyay_admin:admin.global.update')
-        response = staff_client.get(url)
-        assert response.status_code == 302
-        assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
+        response = client.get(url)
+        # Should succeed with 200 without requiring administrator sudo session
+        assert response.status_code == 200
+        content = response.content.decode('utf-8')
+        assert 'Update check results' in content
+
+        # Staff can trigger update check
+        with patch('eventyay.control.views.global_settings.update_check.apply') as mock_apply:
+            post_resp = client.post(url, {'trigger': '1'})
+            assert post_resp.status_code == 302
+            assert post_resp['Location'] == url
+            mock_apply.assert_called_once()
 
     def test_global_settings_query_tab_redirects_for_ticketing(self, staff_client):
         url = reverse('eventyay_admin:admin.global.settings')
@@ -325,3 +343,43 @@ class TestLegacyUrlsAndRedirects:
             response = staff_client.get(f'{url}?tab={tab}')
             assert response.status_code == 302
             assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
+
+
+@pytest.mark.django_db
+class TestPluginProvidedPaymentSettingsRegression:
+    def test_plugin_provided_payment_field_collected_in_ticketing_form_and_saved(self):
+        def custom_payment_receiver(sender, **kwargs):
+            return OrderedDict([
+                ('payment_customplugin_api_key', dj_forms.CharField(label='Custom Plugin API Key', required=False)),
+                ('customplugin_general_setting', dj_forms.CharField(label='General Plugin Setting', required=False)),
+            ])
+
+        register_global_settings.connect(custom_payment_receiver, dispatch_uid='test_custom_payment_receiver')
+        try:
+            # GlobalTicketingSettingsForm must collect payment_customplugin_api_key
+            ticketing_form = GlobalTicketingSettingsForm()
+            assert 'payment_customplugin_api_key' in ticketing_form.fields
+            assert 'customplugin_general_setting' not in ticketing_form.fields
+
+            payment_group = next(g for g in ticketing_form.field_groups if g[0] == 'payment-gateways')
+            assert 'payment_customplugin_api_key' in payment_group[2]
+
+            # GlobalSettingsForm must collect customplugin_general_setting and NOT payment_customplugin_api_key
+            settings_form = GlobalSettingsForm()
+            assert 'customplugin_general_setting' in settings_form.fields
+            assert 'payment_customplugin_api_key' not in settings_form.fields
+
+            # Verify saving via GlobalTicketingSettingsForm persists the value
+            post_data = {
+                'payment_customplugin_api_key': 'test_secret_token_123',
+                'reservation_time': '30',
+                'max_products_per_order': '5',
+            }
+            bound_form = GlobalTicketingSettingsForm(data=post_data)
+            assert bound_form.is_valid(), bound_form.errors
+            bound_form.save()
+
+            gs = GlobalSettingsObject()
+            assert gs.settings.get('payment_customplugin_api_key') == 'test_secret_token_123'
+        finally:
+            register_global_settings.disconnect(dispatch_uid='test_custom_payment_receiver')
