@@ -141,6 +141,41 @@ class TestGlobalSettingsTabsAndSections:
         assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
         mock_update_check.assert_called_once()
 
+    def test_social_image_save_failure_preserves_existing_image(self):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        existing_path = default_storage.save('pub/global/existing_image.png', ContentFile(b'existing content'))
+        try:
+            gs = GlobalSettingsObject()
+            gs.settings.set('seo_social_image', f'file://{existing_path}')
+
+            uploaded_file = SimpleUploadedFile('new_image.png', b'new content', content_type='image/png')
+            form_data = {
+                'region': 'DE',
+                'mail_from': 'admin@example.com',
+                'email_vendor': 'smtp',
+                'smtp_host': 'smtp.example.com',
+                'smtp_port': '587',
+            }
+            form_files = {
+                'seo_social_image': uploaded_file,
+            }
+            form = GlobalSettingsForm(data=form_data, files=form_files)
+            assert form.is_valid(), form.errors
+
+            with patch('django.core.files.storage.default_storage.save', side_effect=OSError('Disk full')), \
+                 patch('django.core.files.storage.default_storage.delete') as mock_delete:
+                form.save()
+                mock_delete.assert_not_called()
+
+            assert default_storage.exists(existing_path)
+            assert gs.settings.get('seo_social_image', as_type=str) == f'file://{existing_path}'
+        finally:
+            if default_storage.exists(existing_path):
+                default_storage.delete(existing_path)
+
 
 @pytest.mark.django_db
 class TestGlobalTicketingSettings:

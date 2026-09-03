@@ -533,9 +533,6 @@ class GlobalSettingsForm(SettingsForm):
 
         if isinstance(new_value, UploadedFile):
             from eventyay.common.urls import get_file_url_path
-            current_file = get_file_url_path(current_value)
-            if current_file:
-                default_storage.delete(current_file)
 
             clean_name, ext = os.path.splitext(new_value.name or image_field)
             new_filename = self.get_new_filename(clean_name)
@@ -544,8 +541,12 @@ class GlobalSettingsForm(SettingsForm):
             try:
                 optimized_path = default_storage.save(optimized_name, new_value)
                 self.cleaned_data[image_field] = f"file://{optimized_path}"
+                current_file = get_file_url_path(current_value)
+                if current_file:
+                    default_storage.delete(current_file)
             except OSError:
                 logger.exception('Could not store original image for %s', image_field)
+                self.cleaned_data[image_field] = current_value
 
         return super().save()
 
@@ -871,10 +872,7 @@ class MetaDataSettingsForm(SettingsForm):
         # Simplified storage logic
         if isinstance(new_value, UploadedFile):
             from eventyay.common.urls import get_file_url_path
-            current_file = get_file_url_path(current_value)
-            if current_file:
-                default_storage.delete(current_file)
-            
+
             clean_name, ext = os.path.splitext(new_value.name or image_field)
             new_filename = self.get_new_filename(clean_name)
             base_path, _ = os.path.splitext(new_filename)
@@ -882,8 +880,12 @@ class MetaDataSettingsForm(SettingsForm):
             try:
                 optimized_path = default_storage.save(optimized_name, new_value)
                 self.cleaned_data[image_field] = f"file://{optimized_path}"
+                current_file = get_file_url_path(current_value)
+                if current_file:
+                    default_storage.delete(current_file)
             except OSError:
                 logger.exception('Could not store original image for %s', image_field)
+                self.cleaned_data[image_field] = current_value
 
         return super().save()
 
