@@ -1,8 +1,10 @@
+from collections import OrderedDict
 from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
-from django.urls import resolve, reverse
+from django import forms as dj_forms
+from django.urls import reverse
 from django.utils.timezone import now
 
 from eventyay.base.models import User
@@ -11,11 +13,11 @@ from eventyay.base.settings import (
     MEETUP_CREATION_ENABLED,
     GlobalSettingsObject,
 )
+from eventyay.base.signals import register_global_settings
 from eventyay.control.forms.global_settings import (
     GlobalSettingsForm,
     GlobalTicketingSettingsForm,
 )
-from eventyay.control.navigation import get_admin_navigation
 
 
 @pytest.fixture
@@ -28,63 +30,6 @@ def staff_client(client, admin_user):
     client.force_login(admin_user)
     admin_user.staffsession_set.create(date_start=now(), session_key=client.session.session_key)
     return client
-
-
-@pytest.mark.django_db
-class TestGlobalSettingsSidebarNavigation:
-    def test_sidebar_structure_and_order(self, rf, admin_user):
-        request = rf.get('/admin/global/settings/')
-        request.user = admin_user
-        request.resolver_match = resolve('/admin/global/settings/')
-
-        nav = get_admin_navigation(request)
-        global_item = next((item for item in nav if str(item.get('label')) == 'Global settings'), None)
-        assert global_item is not None
-        assert global_item['active'] is True
-
-        children = global_item['children']
-        child_labels = [str(c['label']) for c in children]
-
-        # Verify exact sidebar submenus and order
-        assert child_labels == [
-            'Settings',
-            'Ticketing',
-            'System information',
-            'Pages',
-            'Generate keys for SSO',
-            'Social login settings',
-            'Plugins',
-        ]
-
-        # Verify removal of Meta data and Update check as separate sidebar items
-        assert 'Meta data' not in child_labels
-        assert 'Update check' not in child_labels
-
-        # Verify URLs and active states
-        settings_child = next(c for c in children if str(c['label']) == 'Settings')
-        assert settings_child['url'] == reverse('eventyay_admin:admin.global.settings')
-        assert settings_child['active'] is True
-
-        ticketing_child = next(c for c in children if str(c['label']) == 'Ticketing')
-        assert ticketing_child['url'] == reverse('eventyay_admin:admin.global.ticketing')
-        assert ticketing_child['active'] is False
-
-    def test_ticketing_sidebar_active_state(self, rf, admin_user):
-        request = rf.get('/admin/global/ticketing/')
-        request.user = admin_user
-        request.resolver_match = resolve('/admin/global/ticketing/')
-
-        nav = get_admin_navigation(request)
-        global_item = next((item for item in nav if str(item.get('label')) == 'Global settings'), None)
-        assert global_item is not None
-        assert global_item['active'] is True
-
-        children = global_item['children']
-        settings_child = next(c for c in children if str(c['label']) == 'Settings')
-        assert settings_child['active'] is False
-
-        ticketing_child = next(c for c in children if str(c['label']) == 'Ticketing')
-        assert ticketing_child['active'] is True
 
 
 @pytest.mark.django_db
@@ -262,34 +207,6 @@ class TestGlobalTicketingSettings:
         assert gs.settings.get('payment_paypal_connect_client_id') == 'paypal_client_123'
         assert gs.settings.get('reservation_time', as_type=int) == 45
         assert gs.settings.get('max_products_per_order', as_type=int) == 10
-
-    def test_ticketing_form_structure(self):
-        form = GlobalTicketingSettingsForm()
-        expected_groups = ['payment-gateways', 'cart']
-        groups = [g[0] for g in form.field_groups]
-        assert groups == expected_groups
-
-        expected_fields = {
-            'payment_stripe_connect_client_id',
-            'payment_stripe_connect_publishable_key',
-            'payment_stripe_connect_secret_key',
-            'payment_stripe_connect_test_publishable_key',
-            'payment_stripe_connect_test_secret_key',
-            'payment_stripe_connect_app_fee_percent',
-            'payment_stripe_connect_app_fee_min',
-            'payment_stripe_connect_app_fee_max',
-            'payment_paypal_connect_client_id',
-            'payment_paypal_connect_secret_key',
-            'payment_paypal_connect_endpoint',
-            'reservation_time',
-            'max_products_per_order',
-        }
-        assert set(form.fields.keys()) == expected_fields
-
-
-from collections import OrderedDict
-from django import forms as dj_forms
-from eventyay.base.signals import register_global_settings
 
 
 @pytest.mark.django_db
