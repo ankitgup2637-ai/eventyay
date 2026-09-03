@@ -1,0 +1,327 @@
+from decimal import Decimal
+from unittest.mock import patch
+
+import pytest
+from django.urls import resolve, reverse
+from django.utils.timezone import now
+
+from eventyay.base.models import User
+from eventyay.base.settings import (
+    EVENT_SERIES_CREATION_ENABLED,
+    MEETUP_CREATION_ENABLED,
+    GlobalSettingsObject,
+)
+from eventyay.control.forms.global_settings import (
+    GlobalSettingsForm,
+    GlobalTicketingSettingsForm,
+)
+from eventyay.control.navigation import get_admin_navigation
+
+
+@pytest.fixture
+def admin_user():
+    return User.objects.create_user('admin@example.com', 'dummy', is_staff=True)
+
+
+@pytest.fixture
+def staff_client(client, admin_user):
+    client.force_login(admin_user)
+    admin_user.staffsession_set.create(date_start=now(), session_key=client.session.session_key)
+    return client
+
+
+@pytest.mark.django_db
+class TestGlobalSettingsSidebarNavigation:
+    def test_sidebar_structure_and_order(self, rf, admin_user):
+        request = rf.get('/admin/global/settings/')
+        request.user = admin_user
+        request.resolver_match = resolve('/admin/global/settings/')
+
+        nav = get_admin_navigation(request)
+        global_item = next((item for item in nav if str(item.get('label')) == 'Global settings'), None)
+        assert global_item is not None
+        assert global_item['active'] is True
+
+        children = global_item['children']
+        child_labels = [str(c['label']) for c in children]
+
+        # Verify exact sidebar submenus and order
+        assert child_labels == [
+            'Settings',
+            'Ticketing',
+            'System information',
+            'Pages',
+            'Generate keys for SSO',
+            'Social login settings',
+            'Plugins',
+        ]
+
+        # Verify removal of Meta data and Update check as separate sidebar items
+        assert 'Meta data' not in child_labels
+        assert 'Update check' not in child_labels
+
+        # Verify URLs and active states
+        settings_child = next(c for c in children if str(c['label']) == 'Settings')
+        assert settings_child['url'] == reverse('eventyay_admin:admin.global.settings')
+        assert settings_child['active'] is True
+
+        ticketing_child = next(c for c in children if str(c['label']) == 'Ticketing')
+        assert ticketing_child['url'] == reverse('eventyay_admin:admin.global.ticketing')
+        assert ticketing_child['active'] is False
+
+    def test_ticketing_sidebar_active_state(self, rf, admin_user):
+        request = rf.get('/admin/global/ticketing/')
+        request.user = admin_user
+        request.resolver_match = resolve('/admin/global/ticketing/')
+
+        nav = get_admin_navigation(request)
+        global_item = next((item for item in nav if str(item.get('label')) == 'Global settings'), None)
+        assert global_item is not None
+        assert global_item['active'] is True
+
+        children = global_item['children']
+        settings_child = next(c for c in children if str(c['label']) == 'Settings')
+        assert settings_child['active'] is False
+
+        ticketing_child = next(c for c in children if str(c['label']) == 'Ticketing')
+        assert ticketing_child['active'] is True
+
+
+@pytest.mark.django_db
+class TestGlobalSettingsTabsAndSections:
+    def test_settings_tab_order_in_form(self):
+        form = GlobalSettingsForm()
+        group_keys = [g[0] for g in form.field_groups]
+
+        # Expected order of tabs
+        expected_tabs = [
+            'meta-data',
+            'event-creation',
+            'localization',
+            'email',
+            'update-check',
+            'maps',
+            'etherpad',
+            'voxbento',
+            'hubspot',
+        ]
+        assert group_keys == expected_tabs
+
+        # Organizers should NOT be a separate top-level tab
+        assert 'organizers' not in group_keys
+        # Payment Gateways and Cart should NOT be in GlobalSettingsForm
+        assert 'payment_gateways' not in group_keys
+        assert 'payment-gateways' not in group_keys
+        assert 'cart' not in group_keys
+
+    def test_settings_page_renders_expected_tabs_and_sections(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.settings')
+        response = staff_client.get(url)
+        assert response.status_code == 200
+        content = response.content.decode('utf-8')
+
+        # Check fieldset IDs for tabs
+        assert 'id="tab-meta-data"' in content
+        assert 'id="tab-event-creation"' in content
+        assert 'id="tab-localization"' in content
+        assert 'id="tab-email"' in content
+        assert 'id="tab-update-check"' in content
+        assert 'id="tab-maps"' in content
+        assert 'id="tab-etherpad"' in content
+        assert 'id="tab-voxbento"' in content
+        assert 'id="tab-hubspot"' in content
+
+        # Check Meta data content
+        assert 'seo_homepage_title' in content
+        assert 'seo_homepage_description' in content
+        assert 'seo_social_image' in content
+
+        # Check Event Creation sections
+        assert 'Organizers' in content
+        assert 'allow_all_users_create_organizer' in content
+        assert 'allow_payment_users_create_organizer' in content
+        assert 'Event types' in content
+        assert 'event_series_creation_enabled' in content
+        assert 'meetup_creation_enabled' in content
+
+        # Check Update check tab content
+        assert 'Update check results' in content
+        assert 'update_check_perform' in content
+        assert 'update_check_email' in content
+        assert 'telemetry_enabled' in content
+
+        # Payment Gateways and Cart must NOT be in Settings page
+        assert 'id="tab-payment-gateways"' not in content
+        assert 'id="tab-payment_gateways"' not in content
+        assert 'id="tab-cart"' not in content
+
+    def test_settings_save_behavior(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.settings')
+        post_data = {
+            'region': 'DE',
+            'mail_from': 'noreply@example.com',
+            'email_vendor': 'smtp',
+            'smtp_host': 'smtp.example.com',
+            'smtp_port': '587',
+            'allow_all_users_create_organizer': 'on',
+            'allow_payment_users_create_organizer': 'on',
+            'event_series_creation_enabled': 'on',
+            'meetup_creation_enabled': 'on',
+            'seo_homepage_title': 'My Platform Title',
+            'seo_homepage_description': 'My Platform Description',
+            'update_check_perform': 'on',
+            'update_check_email': 'updates@example.com',
+            'telemetry_enabled': 'on',
+        }
+        response = staff_client.post(url, post_data)
+        assert response.status_code == 302, (response.context['form'].errors if response.context and 'form' in response.context else response.content)
+        assert response['Location'] == reverse('eventyay_admin:admin.global.settings')
+
+        gs = GlobalSettingsObject()
+        assert gs.settings.get('seo_homepage_title') == 'My Platform Title'
+        assert gs.settings.get('seo_homepage_description') == 'My Platform Description'
+        assert gs.settings.get('allow_all_users_create_organizer', as_type=bool) is True
+        assert gs.settings.get('allow_payment_users_create_organizer', as_type=bool) is True
+        assert gs.settings.get(EVENT_SERIES_CREATION_ENABLED, as_type=bool) is True
+        assert gs.settings.get(MEETUP_CREATION_ENABLED, as_type=bool) is True
+        assert gs.settings.get('update_check_perform', as_type=bool) is True
+        assert gs.settings.get('update_check_email') == 'updates@example.com'
+        assert gs.settings.get('telemetry_enabled', as_type=bool) is True
+
+    @patch('eventyay.control.views.global_settings.update_check.apply')
+    def test_update_check_trigger_in_settings(self, mock_update_check, staff_client):
+        url = reverse('eventyay_admin:admin.global.settings')
+        response = staff_client.post(url, {'trigger': '1'})
+        assert response.status_code == 302
+        assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
+        mock_update_check.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestGlobalTicketingSettings:
+    def test_ticketing_permissions(self, client):
+        url = reverse('eventyay_admin:admin.global.ticketing')
+        # Anonymous redirected
+        resp_anon = client.get(url)
+        assert resp_anon.status_code == 302
+        assert 'login' in resp_anon['Location']
+
+        # Non-staff forbidden
+        non_staff = User.objects.create_user('regular@example.com', 'dummy')
+        client.force_login(non_staff)
+        resp_non_staff = client.get(url)
+        assert resp_non_staff.status_code == 403
+
+    def test_ticketing_page_renders_payment_gateways_and_cart(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.ticketing')
+        response = staff_client.get(url)
+        assert response.status_code == 200
+        content = response.content.decode('utf-8')
+
+        # Page title and tabs
+        assert '<h1>Ticketing Settings</h1>' in content
+        assert 'id="tab-payment-gateways"' in content
+        assert 'id="tab-cart"' in content
+
+        # Payment gateway providers
+        assert 'Stripe — Ticket Payments' in content
+        assert 'PayPal — Ticket Payments' in content
+        assert 'payment_stripe_connect_client_id' in content
+        assert 'payment_stripe_connect_publishable_key' in content
+        assert 'payment_stripe_connect_secret_key' in content
+        assert 'payment_paypal_connect_client_id' in content
+
+        # Cart fields
+        assert 'reservation_time' in content
+        assert 'max_products_per_order' in content
+
+        # Business organizer billing fields must NOT be in ticketing
+        assert 'payment_stripe_publishable_key' not in content
+        assert 'ticket_fee_percentage' not in content
+        assert 'billing_validation' not in content
+
+    def test_ticketing_settings_save_behavior(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.ticketing')
+        post_data = {
+            'payment_stripe_connect_client_id': 'ca_test_client_id',
+            'payment_stripe_connect_publishable_key': 'pk_live_ticket_stripe_key',
+            'payment_stripe_connect_secret_key': 'sk_live_ticket_stripe_key',
+            'payment_stripe_connect_app_fee_percent': '2.50',
+            'payment_paypal_connect_client_id': 'paypal_client_123',
+            'reservation_time': '45',
+            'max_products_per_order': '10',
+        }
+        response = staff_client.post(url, post_data)
+        assert response.status_code == 302
+        assert response['Location'] == reverse('eventyay_admin:admin.global.ticketing')
+
+        gs = GlobalSettingsObject()
+        assert gs.settings.get('payment_stripe_connect_client_id') == 'ca_test_client_id'
+        assert gs.settings.get('payment_stripe_connect_publishable_key') == 'pk_live_ticket_stripe_key'
+        assert gs.settings.get('payment_stripe_connect_app_fee_percent', as_type=Decimal) == Decimal('2.50')
+        assert gs.settings.get('payment_paypal_connect_client_id') == 'paypal_client_123'
+        assert gs.settings.get('reservation_time', as_type=int) == 45
+        assert gs.settings.get('max_products_per_order', as_type=int) == 10
+
+    def test_ticketing_form_structure(self):
+        form = GlobalTicketingSettingsForm()
+        expected_groups = ['payment-gateways', 'cart']
+        groups = [g[0] for g in form.field_groups]
+        assert groups == expected_groups
+
+        expected_fields = {
+            'payment_stripe_connect_client_id',
+            'payment_stripe_connect_publishable_key',
+            'payment_stripe_connect_secret_key',
+            'payment_stripe_connect_test_publishable_key',
+            'payment_stripe_connect_test_secret_key',
+            'payment_stripe_connect_app_fee_percent',
+            'payment_stripe_connect_app_fee_min',
+            'payment_stripe_connect_app_fee_max',
+            'payment_paypal_connect_client_id',
+            'payment_paypal_connect_secret_key',
+            'payment_paypal_connect_endpoint',
+            'reservation_time',
+            'max_products_per_order',
+        }
+        assert set(form.fields.keys()) == expected_fields
+
+
+@pytest.mark.django_db
+class TestLegacyUrlsAndRedirects:
+    def test_legacy_metadata_url_redirects_to_settings_tab(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.metadata')
+        response = staff_client.get(url)
+        assert response.status_code == 302
+        assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-meta-data"
+
+    def test_legacy_update_url_redirects_to_settings_tab(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.update')
+        response = staff_client.get(url)
+        assert response.status_code == 302
+        assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
+
+    def test_global_settings_query_tab_redirects_for_ticketing(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.settings')
+
+        for tab in ('payment_gateways', 'payment-gateways', 'payment', 'gateways'):
+            response = staff_client.get(f'{url}?tab={tab}')
+            assert response.status_code == 302
+            assert response['Location'] == f"{reverse('eventyay_admin:admin.global.ticketing')}#tab-payment-gateways"
+
+        response_cart = staff_client.get(f'{url}?tab=cart')
+        assert response_cart.status_code == 302
+        assert response_cart['Location'] == f"{reverse('eventyay_admin:admin.global.ticketing')}#tab-cart"
+
+    def test_global_settings_query_tab_redirects_for_metadata_and_update(self, staff_client):
+        url = reverse('eventyay_admin:admin.global.settings')
+
+        for tab in ('meta_data', 'metadata', 'meta-data'):
+            response = staff_client.get(f'{url}?tab={tab}')
+            assert response.status_code == 302
+            assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-meta-data"
+
+        for tab in ('update_check', 'update', 'update-check'):
+            response = staff_client.get(f'{url}?tab={tab}')
+            assert response.status_code == 302
+            assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
