@@ -59,6 +59,7 @@ legend {
 .content-header,
 h2.content-header {
   margin-top: 0;
+  padding-top: 0;
   margin-bottom: 15px;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -68,6 +69,12 @@ h2.content-header {
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+}
+
+#main-card > main h1:first-child,
+#main-card > main h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
 }
 
 button,
