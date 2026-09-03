@@ -30,12 +30,9 @@ from eventyay.control.forms.global_settings import (
     GlobalSettingsForm,
     GlobalTicketingSettingsForm,
     SSOConfigForm,
-    UpdateSettingsForm,
-    MetaDataSettingsForm,
 )
 from eventyay.control.permissions import (
     AdministratorPermissionRequiredMixin,
-    StaffMemberRequiredMixin,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,36 +196,6 @@ class SSOView(AdministratorPermissionRequiredMixin, FormView):
 class DeleteOAuthApplicationView(AdministratorPermissionRequiredMixin, DeleteView):
     model = OAuthApplication
     success_url = reverse_lazy('eventyay_admin:admin.global.sso')
-
-
-class UpdateCheckView(StaffMemberRequiredMixin, FormView):
-    template_name = 'pretixcontrol/global_update.html'
-    form_class = UpdateSettingsForm
-
-    def post(self, request, *args, **kwargs):
-        if 'trigger' in request.POST:
-            update_check.apply()
-            return redirect(self.get_success_url())
-        return super().post(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        form.save()
-        messages.success(self.request, _('Your changes have been saved.'))
-        return super().form_valid(form)
-
-    def form_invalid(self, form):
-        messages.error(self.request, _('Your changes have not been saved, see below for errors.'))
-        return super().form_invalid(form)
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx['gs'] = GlobalSettingsObject()
-        ctx['gs'].settings.set('update_check_ack', True)
-        ctx['tbl'] = check_result_table()
-        return ctx
-
-    def get_success_url(self):
-        return reverse('eventyay_admin:admin.global.update')
 
 
 class MessageView(AdministratorPermissionRequiredMixin, TemplateView):

@@ -726,62 +726,6 @@ class GlobalTicketingSettingsForm(SettingsForm):
         ]
 
 
-class UpdateSettingsForm(SettingsForm):
-    update_check_perform = forms.BooleanField(
-        required=False,
-        label=_('Perform update checks'),
-        help_text=_(
-            'During the update check, eventyay will report an anonymous, unique installation ID, '
-            'the current version of the system and your installed plugins and the number of active and '
-            'inactive events in your installation to servers operated by the eventyay developers. We '
-            'will only store anonymous data, never any IP addresses and we will not know who you are '
-            'or where to find your instance. You can disable this behavior here at any time.'
-        ),
-    )
-    update_check_email = forms.EmailField(
-        required=False,
-        label=_('E-mail notifications'),
-        help_text=_(
-            'We will notify you at this address if we detect that a new update is available. This '
-            'address will not be transmitted to eventyay.com, the emails will be sent by this server '
-            'locally.'
-        ),
-    )
-    
-    # Telemetry settings
-    telemetry_enabled = forms.BooleanField(
-        required=False,
-        label=_('Enable telemetry'),
-        help_text=_(
-            'Send anonymous usage statistics (bucketed counts, deployment info) to help track '
-            'version adoption and deployment patterns. No personal data is collected. '
-            'Data is sent approximately once per day.'
-        ),
-    )
-    telemetry_endpoint = forms.URLField(
-        required=False,
-        label=_('Telemetry endpoint'),
-        help_text=_('The URL where telemetry data will be sent (Google Apps Script URL).'),
-    )
-    telemetry_api_key = SecretKeySettingsField(
-        required=False,
-        label=_('Telemetry API key'),
-        help_text=_('API key for authenticating with the telemetry receiver.'),
-    )
-    telemetry_contact_email = forms.EmailField(
-        required=False,
-        label=_('Maintainer contact'),
-        help_text=_(
-            'Optional email address included in telemetry data to identify who maintains this instance. '
-            'Only visible to those with access to the telemetry data sheet.'
-        ),
-    )
-
-    def __init__(self, *args, **kwargs):
-        self.obj = GlobalSettingsObject()
-        super().__init__(*args, obj=self.obj, **kwargs)
-
-
 class SSOConfigForm(SettingsForm):
     redirect_url = forms.URLField(
         required=True,
@@ -832,62 +776,6 @@ class StripeKeyValidator:
                 }
 
             raise forms.ValidationError(message, code='invalid-stripe-key', params=params)
-
-
-class MetaDataSettingsForm(SettingsForm):
-    auto_fields = [
-        'seo_homepage_title',
-        'seo_homepage_description',
-        'seo_og_title',
-        'seo_og_description',
-        'seo_twitter_title',
-        'seo_twitter_description',
-        'seo_fallback_text',
-    ]
-
-    seo_social_image = ExtFileField(
-        label=_('Social preview image'),
-        ext_whitelist=('.png', '.jpg', '.gif', '.jpeg', '.webp'),
-        max_size=settings.MAX_SIZE_CONFIG[SizeKey.UPLOAD_SIZE_IMAGE],
-        required=False,
-        help_text=_(
-            'This image is used for Open Graph and Twitter cards. '
-            'We recommend an image 1200 px wide and 630 px in height.'
-        ),
-    )
-
-    def __init__(self, *args, **kwargs):
-        self.obj = GlobalSettingsObject()
-        super().__init__(*args, obj=self.obj, **kwargs)
-        for name, field in self.fields.items():
-            if isinstance(field.widget, forms.ClearableFileInput):
-                field.widget.attrs['data-eventyay-file-wrapper'] = 'disabled'
-                field.widget.attrs['data-event-settings-image-tools'] = 'enabled'
-
-    def save(self):
-        image_field = 'seo_social_image'
-        current_value = self.obj.settings.get(image_field, as_type=str, default='') or ''
-        new_value = self.cleaned_data.get(image_field)
-        
-        # Simplified storage logic
-        if isinstance(new_value, UploadedFile):
-            from eventyay.common.urls import get_file_url_path
-
-            clean_name, ext = os.path.splitext(new_value.name or image_field)
-            new_filename = self.get_new_filename(clean_name)
-            base_path, _ = os.path.splitext(new_filename)
-            optimized_name = f'{base_path}{ext}'
-            try:
-                optimized_path = default_storage.save(optimized_name, new_value)
-                self.cleaned_data[image_field] = f"file://{optimized_path}"
-                current_file = get_file_url_path(current_value)
-                if current_file:
-                    default_storage.delete(current_file)
-            except OSError:
-                logger.exception('Could not store original image for %s', image_field)
-                self.cleaned_data[image_field] = current_value
-
-        return super().save()
 
 
 class GlobalBusinessSettingsForm(SettingsForm):

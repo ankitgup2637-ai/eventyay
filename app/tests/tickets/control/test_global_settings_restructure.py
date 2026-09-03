@@ -252,24 +252,11 @@ class TestLegacyUrlsAndRedirects:
         assert response.status_code == 302
         assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-meta-data"
 
-    def test_legacy_update_url_accessible_by_staff_without_admin_session(self, client):
-        # Staff user without an active administrator / sudo session
-        staff_user = User.objects.create_user('staff_only@example.com', 'dummy', is_staff=True)
-        client.force_login(staff_user)
-
+    def test_legacy_update_url_redirects_to_settings_tab(self, staff_client):
         url = reverse('eventyay_admin:admin.global.update')
-        response = client.get(url)
-        # Should succeed with 200 without requiring administrator sudo session
-        assert response.status_code == 200
-        content = response.content.decode('utf-8')
-        assert 'Update check results' in content
-
-        # Staff can trigger update check
-        with patch('eventyay.control.views.global_settings.update_check.apply') as mock_apply:
-            post_resp = client.post(url, {'trigger': '1'})
-            assert post_resp.status_code == 302
-            assert post_resp['Location'] == url
-            mock_apply.assert_called_once()
+        response = staff_client.get(url)
+        assert response.status_code == 302
+        assert response['Location'] == f"{reverse('eventyay_admin:admin.global.settings')}#tab-update-check"
 
     def test_global_settings_query_tab_redirects_for_ticketing(self, staff_client):
         url = reverse('eventyay_admin:admin.global.settings')

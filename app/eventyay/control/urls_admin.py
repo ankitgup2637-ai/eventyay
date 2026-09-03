@@ -56,7 +56,7 @@ urlpatterns = [
 
     path('global/plugins/', global_settings.GlobalPluginManagementView.as_view(), name='admin.global.plugins'),
 
-    url(r'^global/update/$', global_settings.UpdateCheckView.as_view(), name='admin.global.update'),
+    path('global/update/', RedirectView.as_view(url='/admin/global/settings/#tab-update-check', permanent=False), name='admin.global.update'),
     url(r'^global/message/$', global_settings.MessageView.as_view(), name='admin.global.message'),
     url(r'^vouchers/$', admin.VoucherList.as_view(), name='admin.vouchers'),
     url(r'^vouchers/add$', admin.VoucherCreate.as_view(), name='admin.vouchers.add'),
