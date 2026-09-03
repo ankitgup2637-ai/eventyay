@@ -42,6 +42,7 @@ class TestGlobalSettingsTabsAndSections:
         expected_tabs = [
             'meta-data',
             'event-creation',
+            'organizers',
             'localization',
             'email',
             'update-check',
@@ -52,8 +53,6 @@ class TestGlobalSettingsTabsAndSections:
         ]
         assert group_keys == expected_tabs
 
-        # Organizers should NOT be a separate top-level tab
-        assert 'organizers' not in group_keys
         # Payment Gateways and Cart should NOT be in GlobalSettingsForm
         assert 'payment_gateways' not in group_keys
         assert 'payment-gateways' not in group_keys
@@ -68,6 +67,7 @@ class TestGlobalSettingsTabsAndSections:
         # Check fieldset IDs for tabs
         assert 'id="tab-meta-data"' in content
         assert 'id="tab-event-creation"' in content
+        assert 'id="tab-organizers"' in content
         assert 'id="tab-localization"' in content
         assert 'id="tab-email"' in content
         assert 'id="tab-update-check"' in content
@@ -81,11 +81,10 @@ class TestGlobalSettingsTabsAndSections:
         assert 'seo_homepage_description' in content
         assert 'seo_social_image' in content
 
-        # Check Event Creation sections
+        # Check Event Creation and Organizers content
         assert 'Organizers' in content
         assert 'allow_all_users_create_organizer' in content
         assert 'allow_payment_users_create_organizer' in content
-        assert 'Event types' in content
         assert 'event_series_creation_enabled' in content
         assert 'meetup_creation_enabled' in content
 

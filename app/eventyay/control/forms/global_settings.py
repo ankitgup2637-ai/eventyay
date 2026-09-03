@@ -440,10 +440,12 @@ class GlobalSettingsForm(SettingsForm):
                 'seo_social_image',
             ]),
             ('event-creation', _('Event Creation'), [
-                'allow_all_users_create_organizer',
-                'allow_payment_users_create_organizer',
                 EVENT_SERIES_CREATION_ENABLED,
                 MEETUP_CREATION_ENABLED,
+            ]),
+            ('organizers', _('Organizers'), [
+                'allow_all_users_create_organizer',
+                'allow_payment_users_create_organizer',
             ]),
             ('localization', _('Localization'), [
                 'region',
