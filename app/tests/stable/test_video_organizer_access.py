@@ -502,6 +502,9 @@ def test_is_announcements_enabled_helper():
     event_none_config = MagicMock(config=None)
     assert is_announcements_enabled(event_none_config) is False
 
+    event_none_live_features = MagicMock(config={'live_features': None})
+    assert is_announcements_enabled(event_none_live_features) is False
+
 
 def test_is_kiosks_enabled_helper():
     from eventyay.features.live.modules.auth import is_kiosks_enabled

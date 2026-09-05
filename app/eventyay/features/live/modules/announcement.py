@@ -1,22 +1,28 @@
 import logging
 
-from eventyay.core.permissions import Permission
 from eventyay.base.services.announcement import (
     create_announcement,
     get_announcement,
     get_announcements,
     update_announcement,
 )
+from eventyay.core.permissions import Permission
 from eventyay.features.live.channels import GROUP_EVENT
 from eventyay.features.live.decorators import command, event, require_event_permission
 from eventyay.features.live.modules.base import BaseModule
+
 
 logger = logging.getLogger(__name__)
 
 
 def is_announcements_enabled(event) -> bool:
     """Return True if announcements feature is enabled for the event (default False)."""
-    live_features = (getattr(event, "config", None) or {}).get("live_features", {})
+    config = getattr(event, "config", None) or {}
+    if not isinstance(config, dict):
+        return False
+    live_features = config.get("live_features") or {}
+    if not isinstance(live_features, dict):
+        return False
     return bool(live_features.get("announcements", False))
 
 
