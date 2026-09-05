@@ -33,7 +33,9 @@ from eventyay.control.forms.global_settings import (
 )
 from eventyay.control.permissions import (
     AdministratorPermissionRequiredMixin,
+    StaffMemberRequiredMixin,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +140,7 @@ class MetaDataSettingsView(AdministratorPermissionRequiredMixin, View):
         return redirect(reverse('eventyay_admin:admin.global.settings') + '#tab-meta-data')
 
 
-class UpdateRedirectView(AdministratorPermissionRequiredMixin, View):
+class UpdateRedirectView(StaffMemberRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         return redirect(reverse('eventyay_admin:admin.global.settings') + '#tab-update-check')
 

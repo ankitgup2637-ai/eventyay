@@ -1,21 +1,22 @@
+import logging
+import os
 from collections import OrderedDict
 from typing import List, Union
 
 from django import forms
 from django.conf import settings
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import UploadedFile
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
 from eventyay.base.forms import SECRET_REDACTED, SecretKeySettingsField, SecretKeySettingsWidget, SettingsForm
 from eventyay.base.settings import EVENT_SERIES_CREATION_ENABLED, MEETUP_CREATION_ENABLED, GlobalSettingsObject
 from eventyay.base.signals import register_global_settings
-from eventyay.control.forms import ExtFileField
+from eventyay.common.urls import get_file_url_path
 from eventyay.consts import SizeKey
-from django.core.files.uploadedfile import UploadedFile
+from eventyay.control.forms import ExtFileField
 from eventyay.helpers.image_optimize import optimize_uploaded_image
-from django.core.files.storage import default_storage
-import os
-import logging
 
 
 logger = logging.getLogger(__name__)
@@ -534,7 +535,6 @@ class GlobalSettingsForm(SettingsForm):
         new_value = self.cleaned_data.get(image_field)
 
         if isinstance(new_value, UploadedFile):
-            from eventyay.common.urls import get_file_url_path
 
             clean_name, ext = os.path.splitext(new_value.name or image_field)
             new_filename = self.get_new_filename(clean_name)
